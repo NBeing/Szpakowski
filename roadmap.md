@@ -28,16 +28,16 @@ We're interested in "compactness"
 There's a difficulty here with iterations! The behavior might be diff depending on iterated vs axiom
 
 
-Generate a bunch of “programs” [“p1", “p2", “p3”, ...]
-Judge each program [f1, f2, f3]
-Do the genetic algorithm thingie
-Sort by fitness, take top n
-Do some sort of munging
-Goto 2
+[✔] Generate a bunch of “programs” [“p1", “p2", “p3”, ...]
+[✔] Run the simulation
+[-] Judge each program [f1, f2, f3]
+[] Do the genetic algorithm thingie
+[] Sort by fitness, take top n
+[] Do some sort of munging
+[] Goto 2
+[] (Every second, render the fittest program)
 
-(Every second, render the fittest program)
-
-Fitness:
-Lines do not cross
-Fits into a bounding box
-“Compact”?
+[] Fitness:
+[] Lines do not cross
+[] Fits into a bounding box
+[] “Compact”?
