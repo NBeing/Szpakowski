@@ -1,5 +1,7 @@
 // https://www.theparisreview.org/blog/2017/02/15/rhythmical-lines/
 
+const EMPTY_CELL = " "
+
 let pause = false
 let data = []
 function mousePressed() {
@@ -40,6 +42,19 @@ class Drawer {
 
 const meanings = ['←', '→', '↑', '↓']
 
+function oppositeOf(meaning) {
+  switch (meaning) {
+    case '←':
+      return '→'
+    case '→':
+      return '←'
+    case '↑':
+      return '↓'
+    case '↓':
+      return '↑'
+  }
+}
+
 function processInstructions(instructions, drawer) {
   let x = 0
   let y = 0
@@ -48,19 +63,19 @@ function processInstructions(instructions, drawer) {
     switch (symbol) {
       case '→':
         x += 1
-        drawer.move(x, y)
+        drawer.move(x, y, symbol)
         break
       case '↓':
         y += 1
-        drawer.move(x, y)
+        drawer.move(x, y, symbol)
         break
       case '←':
         x -= 1
-        drawer.move(x, y)
+        drawer.move(x, y, symbol)
         break
       case '↑':
         y -= 1
-        drawer.move(x, y)
+        drawer.move(x, y, symbol)
         break
     }
   })
@@ -92,62 +107,84 @@ const degreesToRadians = (degrees) => {
 }
 
 const globals = {
-  strandLength: (25 * 25) / 4,
+  strandLength: (15 * 15) / 3,
   populationSize: 500,
   population: [],
-  baseLength: 10,
-  gridSize: 25,
-  numberOfGenerations: 100,
+  baseLength: 15,
+  gridSize: 15,
 }
 
 class Scorer {
   constructor(width, height) {
     this.width = width
     this.height = height
-    this.counts = new Array(width * height).fill(0)
+    this.grid = new Array(width * height).fill(EMPTY_CELL)
     this.outOfBounds = 0
+    this.overdraw = 0
   }
 
-  move(x, y) {
+  move(x, y, direction) {
     if (x < 0 || x >= this.width) {
       this.outOfBounds++
     } else if (y < 0 || y >= this.height) {
       this.outOfBounds++
     } else {
-      this.counts[x + y * this.width]++
+      const i = x + y * this.width
+      if (this.grid[i] != EMPTY_CELL) {
+        this.overdraw++
+      } else {
+        this.grid[i] = direction
+      }
     }
-
-    this.x = x
-    this.y = y
   }
 
   neighbor(x, y) {
     if (0 <= x && x < this.width && 0 <= y && y < this.height) {
-      return this.counts[x + y * this.width] > 0
+      return this.grid[x + y * this.width]
     }
-    return false
+    return ' '
   }
 
   score() {
     let score = 0
-    let overdraw = 0
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
-        const count = this.counts[x + y * this.width]
-        if (count > 1) {
-          overdraw += count - 1
-          continue
-        }
+        const direction = this.grid[x + y * this.width]
 
-        score += count
-        score += this.neighbor(x - 1, y) ? 1 : 0
-        score += this.neighbor(x + 1, y) ? 1 : 0
-        score += this.neighbor(x, y - 1) ? 1 : 0
-        score += this.neighbor(x, y + 1) ? 1 : 0
+        score += 1
+
+        // If the neighboring cells are filled increase the score.
+        //  d c d
+        //  c X c
+        //  d c d
+        // For now we only do the cardinal directions.
+        const north = this.neighbor(x, y - 1)
+        const nw = this.neighbor(x - 1, y - 1)
+        const ne = this.neighbor(x + 1, y - 1)
+        const south = this.neighbor(x, y + 1)
+        const sw = this.neighbor(x - 1, y + 1)
+        const se = this.neighbor(x + 1, y + 1)
+        const east = this.neighbor(x + 1, y)
+        const west = this.neighbor(x - 1, y)
+
+        score += west == oppositeOf(direction) ? 1 : 0
+        score += east == oppositeOf(direction) ? 1 : 0
+        score += north == oppositeOf(direction) ? 1 : 0
+        score += south == oppositeOf(direction) ? 1 : 0
+
+        score += west != EMPTY_CELL ? 100 : 0
+        score += nw != EMPTY_CELL ? 100 : 0
+        score += ne != EMPTY_CELL ? 100 : 0
+        score += east != EMPTY_CELL ? 100 : 0
+        score += north != EMPTY_CELL ? 100 : 0
+        score += south != EMPTY_CELL ? 100 : 0
+        score += sw != EMPTY_CELL ? 100 : 0
+        score += se != EMPTY_CELL ? 100 : 0
       }
     }
 
-    score = score / Math.max(this.outOfBounds + overdraw, 1)
+    // Penalties need to come last to be really effective.
+    score = score / Math.max(this.outOfBounds + this.overdraw, 1)
 
     return score
   }
@@ -166,14 +203,45 @@ const remix = (parentA_DNA, parentB_DNA) => {
   return result
 }
 
+const getRandomNucleotideThatsNot = (nucleotide) => {
+  const newMeanings = meanings.filter(x => x != nucleotide)
+  return random(newMeanings)
+}
+
 const mutate = (child, mutationRate) => {
   //{!1} Look at each gene in the array.
   for (let i = 0; i < child.length; i++) {
     //{!1} Check a random number against the mutation rate.
     if (random(1) < mutationRate) {
       //{!1} Mutation means choosing a new random character.
-      child[i] = getRandomNucleotide()
+      //if we have up, then we want one that's not down
+      let newNucleotide = getRandomNucleotideThatsNot(oppositeOf(child[i]))
+      child[i] = newNucleotide
     }
+  }
+  return child
+}
+
+function doubleOrHalf() {
+  let dice = random(1)
+  if (dice < rate) {
+    dice = dice / rate
+    const changeLength = random(1)
+    if (changeLength < 0.50) {
+      child = [...child, ...child]
+    } else {
+      const midpoint = Math.floor(child.length / 2)
+      child.splice(0, midpoint)
+    }
+  }
+  return child
+}
+
+function smallChangeInSize(child, rate) {
+  let dice = random(1)
+  if (dice < rate) {
+    const i = Math.round(random(child.length))
+    child.splice(i, 0, child[i])
   }
   return child
 }
@@ -198,7 +266,8 @@ function simulate() {
     // the magic of intercourse?!
     let newChild = remix(parentA, parentB)
     // console.log("Child before mutate", newChild)
-    newChild = mutate(newChild, 0.02)
+    newChild = mutate(newChild, 0.01)
+    newChild = smallChangeInSize(newChild, 0.005)
     // console.log("Child after mutate", newChild)
     newPopulation[i] = {
       dna: newChild,
@@ -241,7 +310,7 @@ function setup() {
   judgeFitness()
 
   setInterval(simulate)
-  frameRate(2)
+  frameRate(10)
 }
 
 function draw() {
@@ -261,12 +330,13 @@ function draw() {
   fill(255)
   noStroke()
   textSize(16)
-  text(`Fittest: ${sortedPopulation[0].fitness.toFixed(3)}`, debugX, 25)
 
   // Draw fitness history trendline
   if (!data) data = []
   data.push(sortedPopulation[0].fitness)
   if (data.length > 60) data.shift()
+
+  text(`Fittest: ${Math.max(...data).toFixed(5)}`, debugX, 25)
 
   drawTrendline(debugX, 40, 180, 50, data)
 
