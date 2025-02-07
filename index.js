@@ -13,28 +13,6 @@ function mousePressed() {
   }
 }
 
-function xOff(direction) {
-  switch (direction) {
-    case 0:
-      return 1
-    case 2:
-      return -1
-    default:
-      return 0
-  }
-}
-
-function yOff(direction) {
-  switch (direction) {
-    case 1:
-      return 1
-    case 3:
-      return -1
-    default:
-      return 0
-  }
-}
-
 class Drawer {
   constructor(xOffset, yOffset, baseLength) {
     this.xOffset = xOffset
@@ -277,10 +255,22 @@ function draw() {
     .sort((a, b) => b.fitness - a.fitness)
     .slice(0, 9)
 
-  console.log("Fittest baby:", sortedPopulation[0].fitness)
+  const maxDim = globals.gridSize * globals.baseLength
+  const debugX = 25 + (maxDim + 25) * 3
+
+  fill(255)
+  noStroke()
+  textSize(16)
+  text(`Fittest: ${sortedPopulation[0].fitness.toFixed(3)}`, debugX, 25)
+
+  // Draw fitness history trendline
+  if (!data) data = []
+  data.push(sortedPopulation[0].fitness)
+  if (data.length > 60) data.shift()
+
+  drawTrendline(debugX, 40, 180, 50, data)
 
   for (let i = 0; i < sortedPopulation.length; i++) {
-    const maxDim = globals.gridSize * globals.baseLength
     const row = floor(i / 3)
     const column = i % 3
     let current_x = 25 + (column * (maxDim + 25))
@@ -301,5 +291,38 @@ function draw() {
       current_y,
       direction: 0,
     })
+  }
+}
+
+function drawTrendline(x, y, width, height, data) {
+  // Draw graph background
+  fill(30)
+  stroke(0)
+  rect(x, y, width, height)
+
+  // Get current value for centering
+  const currentValue = data[data.length - 1] || 0.5
+  const minValue = Math.min(...data)
+  const maxValue = Math.max(...data)
+
+  // Draw trendline
+  if (data.length > 1) {
+    stroke(255, 125)
+    strokeWeight(2)
+    noFill()
+    beginShape()
+    for (let i = 0; i < data.length; i++) {
+      const pointX = map(i, 0, data.length, x, x + width)
+      const pointY = map(data[i], minValue, maxValue, y + height, y)
+      vertex(pointX, pointY)
+    }
+    endShape()
+
+    // Draw dot at current value
+    const lastX = map(data.length - 1, 0, data.length, x, x + width)
+    const lastY = map(currentValue, minValue, maxValue, y + height, y)
+    fill(255)
+    noStroke()
+    circle(lastX, lastY, 6)
   }
 }
